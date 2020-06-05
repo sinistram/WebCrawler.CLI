@@ -4,7 +4,7 @@ using WebCrawler.Models;
 
 namespace WebCrawler.CLI
 {
-    internal class WebCrawlerApp
+    internal class WebCrawlerApp : IDisposable
     {
         private readonly IWebCrawler _webCrawler;
         private readonly CommandLineOptions _options;
@@ -19,6 +19,11 @@ namespace WebCrawler.CLI
         public void Process()
         {
             _webCrawler.ProcessAsync(_options.Url, _options.MaxThreads, false, new[] { "text/html" }).GetAwaiter().GetResult();
+        }
+
+        public void Dispose()
+        {
+            _webCrawler?.Dispose();
         }
 
         private void WriteUrlInfo(UrlInfo urlInfo)

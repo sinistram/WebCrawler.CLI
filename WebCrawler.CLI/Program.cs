@@ -23,8 +23,10 @@ namespace WebCrawler.CLI
             {
                 var services = ConfigureServices(options);
                 var provider = services.BuildServiceProvider();
-                var app = provider.GetService<WebCrawlerApp>();
-                app.Process();
+                using (var app = provider.GetService<WebCrawlerApp>())
+                {
+                    app.Process();
+                }
             }
             catch (Exception e)
             {

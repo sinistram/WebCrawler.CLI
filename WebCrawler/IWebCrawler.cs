@@ -1,10 +1,11 @@
 ﻿using System;
+using System.Threading;
 using System.Threading.Tasks;
 using WebCrawler.Models;
 
 namespace WebCrawler
 {
-    public interface IWebCrawler
+    public interface IWebCrawler : IDisposable
     {
         /// <summary>
         /// Event that calling when new url info received by crawler
@@ -20,5 +21,7 @@ namespace WebCrawler
         /// <param name="contentTypesToLoad">array of content types that will loaded and analyzed to get new urls</param>
         /// <returns></returns>
         Task<SiteInfo> ProcessAsync(string url, int maxThreads, bool processExternalUrls, string[] contentTypesToLoad);
+
+        Task<SiteInfo> ProcessAsync(string url, int maxThreads, bool processExternalUrls, string[] contentTypesToLoad, CancellationToken token);
     }
 }

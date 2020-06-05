@@ -10,7 +10,7 @@ using WebCrawler.Requesting;
 
 namespace WebCrawler
 {
-    public class WebCrawler : IDisposable, IWebCrawler
+    public class WebCrawler : IWebCrawler
     {
         private readonly SemaphoreSlim _siteProcessingSemaphore;
         private readonly IWebPageRequester _webPageRequester;
@@ -38,8 +38,13 @@ namespace WebCrawler
 
         public async Task<SiteInfo> ProcessAsync(string url, int maxThreads, bool processExternalUrls, string[] contentTypesToLoad)
         {
+            return await ProcessAsync(url, maxThreads, processExternalUrls, contentTypesToLoad, CancellationToken.None);
+        }
+
+        public async Task<SiteInfo> ProcessAsync(string url, int maxThreads, bool processExternalUrls, string[] contentTypesToLoad, CancellationToken token)
+        {
             _logger.LogInformation("Waiting for _siteProcessingSemaphore. (Only one processing can be executed for the one instance at the same time)");
-            await _siteProcessingSemaphore.WaitAsync();
+            await _siteProcessingSemaphore.WaitAsync(token).ConfigureAwait(false);
 
             _logger.LogInformation($"Start processing url {url}");
             try
@@ -63,7 +68,7 @@ namespace WebCrawler
                 _urlProcessingTasks = new List<Task>();
                 _crawlerQueue.EnqueueIfNotProcessed(url);
 
-                await ProcessSiteAsync();
+                await ProcessSiteAsync(token).ConfigureAwait(false);
 
                 return _siteInfo;
             }
@@ -81,16 +86,22 @@ namespace WebCrawler
             _urlProcessingSemaphore?.Dispose();
         }
 
-        private async Task ProcessSiteAsync()
+        private async Task ProcessSiteAsync(CancellationToken token)
         {
             while(_processing)
             {
-                await _urlProcessingSemaphore.WaitAsync();
+                if (token.IsCancellationRequested)
+                {
+                    _processing = false;
+                    break;
+                }
+
+                await _urlProcessingSemaphore.WaitAsync(token);
                 try
                 {
                     if (_crawlerQueue.TryDequeue(out var url))
                     {
-                        var task = Task.Run(() => ProcessUrl(url));
+                        var task = Task.Run(() => ProcessUrl(url), token);
                         _urlProcessingTasks.Add(task);
                     }
                     else
@@ -105,7 +116,7 @@ namespace WebCrawler
                         }
                         else
                         {
-                            await Task.Delay(2000);
+                            await Task.Delay(2000).ConfigureAwait(false);
                         }
                     }
                 }
