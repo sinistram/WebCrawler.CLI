@@ -97,16 +97,17 @@ namespace WebCrawler
                 }
 
                 await _urlProcessingSemaphore.WaitAsync(token);
+                Task task = null;
                 try
                 {
                     if (_crawlerQueue.TryDequeue(out var url))
                     {
-                        var task = Task.Run(() => ProcessUrl(url), token);
+                        task = ProcessUrl(url);
                         _urlProcessingTasks.Add(task);
                     }
                     else
                     {
-                        if (_urlProcessingTasks.All(task => task.IsCompleted))
+                        if (_urlProcessingTasks.All(t => t.IsCompleted))
                         {
                             if (_crawlerQueue.IsEmpty)
                             {
@@ -116,13 +117,13 @@ namespace WebCrawler
                         }
                         else
                         {
-                            await Task.Delay(2000).ConfigureAwait(false);
+                            await Task.Delay(2000, token).ConfigureAwait(false);
                         }
                     }
                 }
                 finally
                 {
-                    _urlProcessingSemaphore.Release();
+                    _ = task?.ContinueWith((t) => _urlProcessingSemaphore.Release(), token);
                 }
             }
         }
@@ -148,7 +149,7 @@ namespace WebCrawler
                 var urls = _hrefFinder.GetHrefUrls(url, webPageContent.Content).ToArray();
                 foreach (var newUrl in urls)
                 {
-                    if (url != null && (_processExternalUrls || url.StartsWith(_siteInfo.RootUrl))) 
+                    if (_processExternalUrls || url.StartsWith(_siteInfo.RootUrl)) 
                     {
                         _crawlerQueue.EnqueueIfNotProcessed(newUrl);
                     }
